@@ -1,5 +1,22 @@
+
+# Secrets and environment variables
 .env
+.env.*
+!.env.example
+
+# Python virtual environments
 .venv/
+venv/
+
+# Python cache files
 __pycache__/
-.pytest_cache/
 *.py[cod]
+
+# Test cache
+.pytest_cache/
+
+# Local editor settings
+.vscode/
+
+# Evaluation outputs (generated locally; do not commit model responses)
+eval/results/
