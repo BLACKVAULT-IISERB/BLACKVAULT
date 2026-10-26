@@ -12,6 +12,32 @@ class AgentWorkflow:
     def __init__(self, coordinator: AgentCoordinator):
         self._coordinator = coordinator
 
+    def _resolve_payee_name(self, recipient: str) -> str | None:
+        """Resolve a display name or alias against the trusted payee directory."""
+        app = self._coordinator._confirmation._app
+        payees = app.state.payees
+
+        normalized = recipient.strip().casefold()
+        if not normalized:
+            return None
+
+        matches = []
+
+        for payee_id, display_name in payees.items():
+            name = display_name.casefold()
+            aliases = {name}
+
+            # Permit natural references such as "utilities" and "rent".
+            for suffix in (" co", " services"):
+                if name.endswith(suffix):
+                    aliases.add(name[:-len(suffix)].strip())
+
+            if normalized in aliases:
+                matches.append(payee_id)
+
+        # Do not guess when the name is unknown or ambiguous.
+        return matches[0] if len(matches) == 1 else None
+
     def handle_proposal(
         self,
         proposal: dict[str, Any],
@@ -58,13 +84,39 @@ class AgentWorkflow:
             }
 
         payee_id = arguments.get("payee_id")
+        payee_name = arguments.get("payee_name")
         amount = arguments.get("amount")
         currency = arguments.get("currency", "INR")
 
-        if not isinstance(payee_id, str) or not payee_id.strip():
+        if payee_id is not None:
+            # Preserve explicit IDs, including unknown IDs. The backend
+            # must reject nonexistent or unapproved payees at submission.
+            if not isinstance(payee_id, str) or not payee_id.strip():
+                return {
+                    "status": "needs_clarification",
+                    "reason": "A valid payee ID is required.",
+                    "executed": False,
+                }
+
+            payee_id = payee_id.strip()
+
+        elif isinstance(payee_name, str) and payee_name.strip():
+            payee_id = self._resolve_payee_name(payee_name)
+
+            if payee_id is None:
+                return {
+                    "status": "needs_clarification",
+                    "reason": (
+                        "The recipient could not be uniquely matched "
+                        "to a known payee."
+                    ),
+                    "executed": False,
+                }
+
+        else:
             return {
                 "status": "needs_clarification",
-                "reason": "A valid payee ID is required.",
+                "reason": "A recipient name or payee ID is required.",
                 "executed": False,
             }
 
