@@ -85,3 +85,44 @@ def test_wrong_customer_cannot_confirm():
 
     assert result["reason_code"] == "CUSTOMER_MISMATCH"
     assert state.accounts["acct-001"].balance == Decimal("25000.00")
+
+
+
+def test_expired_proposal_cannot_execute():
+    state = seed_demo_state(AppState())
+    app = Blackvault(state, b"x" * 32)
+    service = TransferConfirmationService(app, ttl_seconds=0)
+
+    proposal = prepare(service)
+
+    result = service.confirm_transfer(
+        proposal["proposal_id"],
+        customer_id="cust-001",
+    )
+
+    assert result["status"] == "REJECTED"
+    assert result["reason_code"] == "PROPOSAL_EXPIRED"
+    assert state.accounts["acct-001"].balance == Decimal("25000.00")
+
+
+def test_unapproved_payee_is_denied_after_confirmation():
+    service, state = make_service()
+
+    proposal = service.prepare_transfer(
+        customer_id="cust-001",
+        source_account_id="acct-001",
+        payee_id="payee-friend",
+        amount="100",
+        currency="INR",
+        idempotency_key="unapproved-payee-test",
+    )
+
+    result = service.confirm_transfer(
+        proposal["proposal_id"],
+        customer_id="cust-001",
+    )
+
+    assert result["status"] == "DENIED"
+    assert result["reason_code"] == "PAYEE_NOT_APPROVED"
+    assert state.accounts["acct-001"].balance == Decimal("25000.00")
+
