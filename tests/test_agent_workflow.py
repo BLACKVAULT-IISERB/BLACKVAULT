@@ -1,4 +1,6 @@
 
+from decimal import Decimal
+
 from blackvault import AppState, Blackvault, seed_demo_state
 from blackvault.agent_coordinator import AgentCoordinator
 from blackvault.agent_workflow import AgentWorkflow
@@ -75,3 +77,29 @@ def test_unsupported_action_does_not_prepare_transfer():
 
     assert result["status"] == "unsupported"
     assert state.accounts["acct-001"].balance == original_balance
+
+
+def test_payee_name_resolves_to_trusted_payee_id():
+    workflow, state = make_workflow()
+
+    result = workflow.handle_proposal(
+        {
+            "status": "proposal_only",
+            "action": "transfer",
+            "arguments": {
+                "payee_name": "Utilities Co",
+                "amount": "500",
+                "currency": "INR",
+            },
+            "executed": False,
+            "requires_authorization": True,
+        },
+        authenticated_customer_id="cust-001",
+        trusted_source_account_id="acct-001",
+    )
+
+    assert result["status"] == "AWAITING_CONFIRMATION"
+    assert result["payee_id"] == "payee-utilities"
+    assert result["executed"] is False
+    from decimal import Decimal
+    assert state.accounts["acct-001"].balance == Decimal("25000.00")
