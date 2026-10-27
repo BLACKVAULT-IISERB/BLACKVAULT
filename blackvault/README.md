@@ -1,63 +1,76 @@
 # BLACKVAULT Backend
 
-## Purpose
+## Overview
 
-This package implements the trusted authorization layer for the BLACKVAULT synthetic banking environment.
+The `blackvault/` package implements the backend security layer for BLACKVAULT. It evaluates transaction proposals, enforces authorization policies, manages approvals and permits, and controls transactions in a synthetic banking environment.
 
-It receives structured transaction proposals, applies customer-specific security policies, and allows the mock bank to execute a transaction only after the required checks succeed.
+The AI agent can propose a transaction, but **the trusted backend is responsible for authorization and execution**.
 
-## Responsibilities
+## Core Responsibilities
 
 - Validate transaction proposals.
-- Check account ownership and status.
-- Enforce approved-payee rules and spending limits.
-- Handle transactions requiring additional approval.
-- Issue and verify transaction-bound permits.
-- Prevent permit forgery and reuse.
-- Record transaction decisions and audit events.
-- Update synthetic account balances after authorization.
+- Enforce account ownership and transaction policies.
+- Check approved payees and spending limits.
+- Handle explicit confirmation and additional approval requirements.
+- Verify transaction permits and prevent unauthorized reuse.
+- Execute authorized transactions against synthetic accounts.
+- Record transaction outcomes and security events.
 
-## Main Modules
+## Module Guide
 
-| Module | Responsibility |
+| File | Description |
 |---|---|
-| `bank.py` | Synthetic account operations and protected transaction execution |
-| `gate.py` | Proposal validation and authorization decisions |
-| `policy.py` | Customer policy and spending-limit checks |
-| `permits.py` | Signed permit creation and verification |
-| `approvals.py` | Approval workflow |
-| `audit.py` | Audit event recording and queries |
-| `models.py` | Transaction, decision, account, and policy models |
-| `state.py` | In-memory application state and demo data |
-| `service.py` | Main application-facing backend interface |
-| `config.py` | Signing-key configuration |
+| `__init__.py` | Initializes the Python package and may expose package-level interfaces. |
+| `agent_adapter.py` | Provides an adapter between the AI agent and backend functionality. |
+| `agent_coordinator.py` | Coordinates agent-related operations. |
+| `agent_workflow.py` | Manages the workflow for processing agent-generated transaction proposals. |
+| `approvals.py` | Handles transaction approval requirements and decisions. |
+| `audit.py` | Records transaction decisions and security-related events. |
+| `bank.py` | Implements synthetic banking operations and account transactions. |
+| `config.py` | Contains backend configuration and security-related settings. |
+| `confirmation.py` | Handles explicit confirmation of pending transactions. |
+| `exceptions.py` | Defines application-specific exceptions. |
+| `file_guide.md` | Provides additional documentation about the package's files. |
+| `gate.py` | Enforces authorization checks before transactions can proceed. |
+| `models.py` | Defines data structures used by the backend. |
+| `permits.py` | Handles transaction permit creation and verification. |
+| `policy.py` | Defines authorization rules, approved payees, and spending limits. |
+| `repositories.py` | Provides interfaces or implementations for accessing application data. |
+| `service.py` | Provides the main application-facing backend service. |
+| `state.py` | Manages application state and synthetic data. |
+| `transaction_service.py` | Handles transaction-related operations. |
 
-## Transaction Flow
+## Transaction Workflow
 
-1. Receive a structured proposal.
-2. Validate the customer, source account, payee, amount, and currency.
-3. Check account ownership, payee approval, and spending limits.
-4. Request additional approval when required.
-5. Issue a signed permit for an authorized transaction.
-6. Verify the permit and relevant transaction constraints.
-7. Update the synthetic balance and record the outcome.
+1. The AI agent submits a structured transaction proposal.
+2. The backend validates the proposal and relevant account details.
+3. The permission gate checks the applicable authorization policies.
+4. Transactions requiring additional approval or confirmation are held until the required step is completed.
+5. The backend verifies the applicable permit and transaction constraints.
+6. The synthetic bank processes an authorized transaction.
+7. The transaction outcome is recorded for auditing.
 
-## Using the Backend
+## Security Principles
 
-From the repository root, initialize the synthetic state and create the application service using the integration API documented in the root `README.md`.
+- AI-generated proposals are treated as untrusted input.
+- The agent cannot authorize its own transactions.
+- Backend policies determine which transactions are permitted.
+- Transaction permits must be validated before execution.
+- Approval and confirmation requirements must be enforced by trusted application logic.
+- Failed or denied transactions must not improperly modify account balances.
 
-Use `app.propose(...)` as the application-facing transaction entry point. Do not expose internal bank execution methods, permit-management internals, or signing keys to the AI agent.
+## Testing
 
-## Security Notes
+Run the automated tests from the repository root:
 
-- Authorization decisions must be made by trusted backend code.
-- Model-generated text must not override customer policy.
-- The signing key must remain within the trusted backend process.
-- Approval must be bound to the specific transaction being approved.
-- Internal Python methods alone are not a security boundary.
+```bash
+python -m pytest -v
+```
+
+Refer to the root `README.md` for project setup and demonstration instructions.
 
 ## Limitations
 
-The implementation uses in-memory state and simulated approval. It does not provide durable storage, production identity verification, distributed locking, or real banking connectivity.
+BLACKVAULT is a research prototype that uses synthetic banking data. It is not connected to real banking infrastructure and is not intended for production financial transactions.
 
-This package is for controlled research and testing only.
+Production deployment would require additional work on persistent storage, identity management, concurrency control, monitoring, audit integrity, and independent security testing.
