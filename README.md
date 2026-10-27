@@ -1,120 +1,145 @@
 # BLACKVAULT
 
-BLACKVAULT is a synthetic banking sandbox for demonstrating how a backend can keep an AI agent within a customer's transaction permissions. It uses fictional customers, accounts, payees, and balances only. It does not connect to banks, payment services, or real funds.
+**A security layer for AI agents that propose banking transactions.**
 
-## The problem
+BLACKVAULT is a research prototype that tests whether a trusted backend can prevent an AI agent from making unauthorized transactions, even when its inputs contain malicious or misleading instructions.
 
-An AI agent may read invoices, emails, webpages, or payee notes while helping with a payment. Those sources can contain prompt injection: instructions that try to make the agent ignore the customer's intent and send money to an attacker. A model can propose an action, but text supplied to the model is not trusted authorization.
+It uses a **synthetic banking environment** with fictional customers, accounts, payees, and balances. It does not connect to real banks or move real money.
 
-BLACKVAULT places a trusted backend permission gate between an agent proposal and synthetic balance changes. The gate checks customer-owned policy and the bank verifies a signed, short-lived permit before executing a transfer.
+## The Problem
 
-## Architecture and transaction flow
+AI agents can process invoices, emails, webpages, and payment instructions. These sources may contain prompt-injection attempts that try to redirect payments or override the user's intent.
 
-1. The agent submits a structured `Proposal` with customer ID, source account ID, payee ID, amount, currency, and optional idempotency key. Untrusted document contents are not policy inputs.
-2. `PermissionGate` validates the request, checks account ownership and active status, confirms the payee is present and approved by the customer's active policy, validates INR amount precision, and enforces per-transaction and UTC-day spending limits.
-3. If the amount exceeds the policy's approval threshold, the gate creates an expiring approval request bound to the exact transaction details and returns `PENDING_APPROVAL`. The simulated trusted operator callback records a decision. The caller then resubmits the same proposal with the returned approval ID. Natural-language claims by the agent are not accepted as approval.
-4. After authorization (and any required approval), the gate issues an HMAC-SHA-256 permit bound to the transaction, customer, source account, payee, amount, currency, timestamps, and nonce.
-5. The application service passes that permit to the bank's internal execution method. The bank independently verifies the signature, expiry, transaction binding, account ownership/status, policy, spending limit, approval, destination, and available balance. Under the shared in-process lock, it updates the synthetic balances, consumes the permit and approval, updates the transaction, and records the audit event.
-6. Denials and approval events are also recorded in the in-memory audit list. Audit records do not include signing secrets or raw invoice/webpage content.
+An AI model should not be trusted to authorize its own financial actions.
 
-All production-facing integration should use `Blackvault.propose(...)`; the bank execution method is an internal helper. Do not expose the `Blackvault` object's permit manager, bank internals, signing key, or approval callback to the AI agent. Python-level internal names are not a security sandbox, so the process/API adapter must enforce that separation.
+## Our Approach
 
-## Project layout
+BLACKVAULT separates the AI agent's proposed action from the backend's authorization decision.
+
+1. **Agent:** Produces a structured transaction proposal.
+2. **Permission gate:** Checks account ownership, approved payees, transaction limits, and applicable approval requirements.
+3. **Approval workflow:** Holds transactions that require additional approval.
+4. **Permit verification:** Validates a signed, transaction-bound permit before execution.
+5. **Mock bank:** Independently checks authorization and available funds before changing synthetic balances.
+6. **Audit trail:** Records transaction decisions and relevant security events.
+
+**Core principle:** The agent may propose a transaction, but only the trusted backend can authorize it.
+
+## Key Features
+
+- Policy-based transaction authorization
+- Approved-payee and spending-limit checks
+- Signed permits with expiry and transaction binding
+- Approval workflow for higher-value transactions
+- Protection against forged and reused permits
+- Synthetic banking environment for safe testing
+- Unit, adversarial, and concurrency tests
+- Evaluation scripts for measuring authorization outcomes
+
+## Architecture
 
 ```text
-blackvault-complete-source/
-├── AI AGENT/                 # Separate agent component; not imported by this backend
-├── blackvault/
-│   ├── bank.py               # Account reads and internal permit-checked execution
-│   ├── gate.py               # Central proposal validation and permit authorization
-│   ├── policy.py             # Decimal validation and customer policy checks
-│   ├── permits.py            # HMAC permit creation and verification
-│   ├── approvals.py          # Simulated independent approval workflow
-│   ├── audit.py               # In-memory audit event recording and queries
-│   ├── models.py              # Proposal, decision, account, and policy models
-│   ├── state.py               # Shared in-memory application state and demo seed
-│   ├── service.py             # Stable Blackvault integration facade
-│   ├── transaction_service.py # Compatibility export of the facade
-│   ├── config.py              # Environment signing-key loader
-│   ├── repositories.py        # Small state access facade
-│   ├── exceptions.py
-│   └── __init__.py
-├── tests/                     # Pytest unit, adversarial, and concurrency tests
-├── demo.py                    # Deterministic synthetic demonstration
-├── README.md
-├── requirements.txt
-├── .env.example
-└── .gitignore
+AI Agent / Test Input
+        |
+        v
+Structured Transaction Proposal
+        |
+        v
+Permission Gate
+        |
+        +---- Denied
+        |
+        +---- Approval Required
+        |
+        v
+Signed Transaction Permit
+        |
+        v
+Mock Bank Verification
+        |
+        v
+Synthetic Balance Update + Audit Event
 ```
 
-Storage is in memory only. There is no SQL database or external persistence service.
+## Project Structure
 
-## Setup (Windows PowerShell)
+| Directory / File | Purpose |
+|---|---|
+| `AI AGENT/` | AI agent component that generates transaction proposals |
+| `blackvault/` | Backend authorization, policy, permit, approval, bank, and audit logic |
+| `tests/` | Automated tests for backend behavior and security controls |
+| `eval/` | Evaluation cases, runners, and reports, if present in the checked-out version |
+| `demo.py` | Deterministic demonstration of transaction security scenarios |
+| `requirements.txt` | Python dependencies |
+| `.env.example` | Example environment configuration |
 
-From this project root:
+## Setup
+
+Requirements: Python 3.10 or later is recommended. Use the Python version supported by the project's dependencies.
+
+### Windows PowerShell
 
 ```powershell
+git clone https://github.com/BLACKVAULT-IISERB/BLACKVAULT.git
+cd BLACKVAULT
+
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-The demo requires a base64-encoded signing key with at least 32 random bytes. Generate and set one for the current PowerShell session:
+Set a temporary signing key for the current PowerShell session:
 
 ```powershell
 $env:BLACKVAULT_HMAC_KEY = python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
 ```
 
-`demo.py` reads `BLACKVAULT_HMAC_KEY` using `blackvault.config.signing_key_from_env()` and fails closed when it is missing or too short. `.env.example` documents the variable; the project does not load `.env` files automatically. Do not commit a real local `.env` or signing key.
+The key is for local testing only. Do not commit real secrets or share signing keys with the AI agent.
 
-## Run the demo and tests
+## Run the Demo
 
 ```powershell
 python demo.py
+```
+
+The demo illustrates approved transfers, denied payees, transaction limits, approval requirements, forged permits, permit replay, insufficient funds, and a prompt-injection-style proposal.
+
+All transactions use fictional data.
+
+## Run the Tests
+
+```powershell
 python -m pytest -v
 ```
 
-The demo shows an approved transfer, unapproved and over-limit proposals, independent approval, a forged permit, a permit replay, insufficient funds, and an unapproved prompt-injection-style proposal. Results use fictional accounts and balances.
+Tests help verify the implemented controls; they do not prove that the system is secure against every possible attack.
 
-## Backend integration API
+If the evaluation scripts are present in your checkout, consult `eval/README.md` for their commands and interpretation.
 
-The current integration surface is defined by the code in `blackvault/`:
+## Current Status
 
-```python
-from blackvault import AppState, Blackvault, Proposal, seed_demo_state
+BLACKVAULT is a **research prototype**, not a production banking product.
 
-state = seed_demo_state(AppState())
-app = Blackvault(state, signing_key_bytes)  # at least 32 bytes
+Its current design demonstrates backend-enforced authorization in a synthetic environment. The AI agent and backend are separate components; a production transport or API adapter between them is not yet implemented.
 
-account = app.account_info(customer_id, account_id)
-decision = app.propose(Proposal(
-    customer_id=customer_id,
-    source_account_id=account_id,
-    payee_id=payee_id,
-    amount="125.00",
-    currency="INR",
-    idempotency_key="agent-request-123",
-))
-# If status is PENDING_APPROVAL, show the exact request to a trusted operator,
-# call app.approve(decision.approval_id, approved=True), then resubmit the same
-# Proposal with approval_id=decision.approval_id.
-app.transaction(decision.transaction_id)
-app.audit_events(category=None, customer_id=None)
-```
+## Limitations
 
-`Decision` reports a status, transaction ID, reason code, message, and optionally an approval ID. `app.propose(proposal, approval_id=None)` returns `EXECUTED`, `DENIED`, `PENDING_APPROVAL`, or `FAILED`. The `permit` field is internal and excluded from `Decision.as_dict()`.
+- Application state and audit events are held in memory.
+- Human approval is simulated.
+- Replay and idempotency history do not persist across restarts.
+- There is no production identity system, durable database, or real banking integration.
+- The prototype has not undergone an independent security audit.
 
-### AI agent and backend team integration
+## Future Work
 
-The `AI AGENT/` folder is a separate team component; the backend does not import an agent implementation. Integrate the agent by having it produce a `Proposal` and call the backend facade, then consume the structured decision and transaction result. Only the backend/service process should hold the signing key. The agent must not set trusted policy, mint permits, or approve its own transactions.
+- Add a secure interface between the agent and backend.
+- Introduce durable storage and stronger audit integrity.
+- Integrate bank-managed identity and approval systems in a controlled test environment.
+- Expand adversarial testing and evaluation coverage.
+- Assess deployment requirements with banking security and compliance teams.
 
-The agent-facing request/response transport (for example, HTTP or a local process protocol) is not implemented in this repository. Team members should agree on the `Proposal` fields and the `Decision` status/reason codes before adding an adapter. The present backend API can also support the red-team harness through isolated `AppState` instances, explicit `seed_demo_state(...)`, `app.propose(...)`, `app.transaction(...)`, and `app.audit_events(...)`.
+## Intended Use
 
-## Current limitations
-
-- All customers, accounts, policies, transactions, permits, approvals, spending records, and audit events are held in process memory. They are lost on restart; replay protection and idempotency history do not survive it.
-- The `RLock` coordinates threads in one process only; it does not coordinate multiple processes or hosts.
-- Human approval is a simulated callback, not identity verification or a secure out-of-band approval product.
-- Audit events are in-memory records, not durable or tamper-resistant evidence. Python standard-library logging is not a replacement for a production audit system.
-- This repository has no HTTP server, authentication layer, production key-management integration, or real banking connection.
-- The prototype has not been independently security-audited and is not suitable for real banking transactions. Passing tests is not proof of production security.
+BLACKVAULT is intended for research, demonstration, and controlled testing of AI-agent transaction security. It must not be used to authorize real financial transactions in its current form.
