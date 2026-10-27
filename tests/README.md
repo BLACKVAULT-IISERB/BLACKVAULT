@@ -1,45 +1,43 @@
-# BLACKVAULT Tests
+# Automated Tests
 
 ## Purpose
 
-Contains automated tests that verify banking functionality, transaction authorization, security controls, and resistance to invalid or adversarial transaction requests.
+This directory contains automated tests for the BLACKVAULT backend and its security controls.
 
-## Test Files
+The tests verify expected behavior for valid transactions, rejected transactions, approval workflows, and other security-sensitive cases.
 
-| File | Purpose |
-|---|---|
-| `conftest.py` | Creates shared test fixtures for the application and demo state. |
-| `test_security.py` | Tests transfers, access control, invalid transactions, idempotency, permit tampering, replay, and audit logging. |
-| `test_gate.py` | Tests approval retries, daily limits, and transaction failure handling. |
-| `test_policy.py` | Tests missing and inactive policies. |
-| `test_permits.py` | Tests invalid, expired, tampered, and future-dated permits. |
-| `test_approvals.py` | Tests rejected and expired approvals. |
-| `test_bank.py` | Tests account access restrictions and currency mismatches. |
-| `test_audit.py` | Tests audit event recording and querying. |
-| `test_concurrency.py` | Tests whether simultaneous transfers can cause account overspending. |
+## What Is Tested
 
-## How the Tests Connect to the Backend
+Depending on the test module, coverage may include:
 
-The tests import the `blackvault` package and use shared fixtures from `conftest.py` to create an application instance with fictional banking data.
+- Valid and invalid transaction proposals
+- Account ownership and account status
+- Approved and unapproved payees
+- Transaction and spending limits
+- Required approval and rejected approval
+- Forged, expired, or reused permits
+- Insufficient funds
+- Audit event behavior
+- Duplicate requests and concurrency-sensitive operations
 
-They submit transaction proposals, trigger security checks, and verify the resulting status, rejection reason, account balances, permits, approvals, and audit events.
+## Run the Tests
 
-## Running the Tests
+Run the following command from the repository root:
 
-Run from the repository root:
-
-```bash
-python -m pytest -q
+```powershell
+python -m pytest -v
 ```
 
-Run an individual test file:
+To run this directory only:
 
-```bash
-python -m pytest tests/test_security.py -v
+```powershell
+python -m pytest tests -v
 ```
 
-## Evaluation Scope
+## Interpreting Results
 
-The tests verify the implemented backend controls, including authorization rules, permit integrity, approval handling, idempotency, audit logging, and concurrency safety.
+- **Passed:** The tested assertion matched the expected behavior.
+- **Failed:** Inspect the failure message and traceback before changing code.
+- **Coverage limitation:** Passing tests do not prove that every attack is prevented.
 
-These tests do not, by themselves, establish that the complete AI agent is resistant to all adversarial attacks. End-to-end attack evaluation must also test the integrated agent and security gate.
+When adding a security test, document the attack or behavior being tested, the expected decision, and whether the synthetic account balance or audit state should change.
