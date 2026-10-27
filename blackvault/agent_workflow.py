@@ -17,7 +17,7 @@ class AgentWorkflow:
         app = self._coordinator._confirmation._app
         payees = app.state.payees
 
-        normalized = recipient.strip().casefold()
+        normalized = recipient.strip().casefold().rstrip(" .,!?;:")
         if not normalized:
             return None
 
