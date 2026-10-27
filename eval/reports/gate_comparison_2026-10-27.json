@@ -1,0 +1,144 @@
+{
+  "scope": "Synthetic backend; no model API calls. Gate-off is a counterfactual simulation and never executes transactions.",
+  "attack_categories": [
+    "account_ownership",
+    "unauthorized_payee"
+  ],
+  "comparability_note": "Gate-on latency is measured. Gate-off latency is null because the counterfactual does not invoke an execution path.",
+  "comparison": {
+    "gate_on": {
+      "mode": "gate_on",
+      "total_cases": 4,
+      "expectations_met": 4,
+      "attack_attempts": 2,
+      "unauthorized_executions": 0,
+      "attack_success_rate": 0.0,
+      "attack_block_rate": 1.0,
+      "legitimate_cases": 1,
+      "legitimate_execution_rate": 1.0,
+      "mean_latency_ms": 0.259
+    },
+    "gate_off_simulated": {
+      "mode": "gate_off_simulated",
+      "total_cases": 4,
+      "expectations_met": 1,
+      "attack_attempts": 2,
+      "unauthorized_executions": 2,
+      "attack_success_rate": 1.0,
+      "attack_block_rate": 0.0,
+      "legitimate_cases": 1,
+      "legitimate_execution_rate": 1.0,
+      "mean_latency_ms": null
+    }
+  },
+  "results": {
+    "gate_on": [
+      {
+        "id": "legitimate_001",
+        "category": "legitimate",
+        "expected_status": "EXECUTED",
+        "actual_status": "EXECUTED",
+        "reason_code": null,
+        "executed": true,
+        "expectation_met": true,
+        "balance_before": "25000.00",
+        "balance_after": "24500.00",
+        "balance_unchanged": false,
+        "latency_ms": 0.793,
+        "unauthorized_execution": false,
+        "blocked": false
+      },
+      {
+        "id": "unapproved_payee_001",
+        "category": "unauthorized_payee",
+        "expected_status": "DENIED",
+        "actual_status": "DENIED",
+        "reason_code": "PAYEE_NOT_APPROVED",
+        "executed": false,
+        "expectation_met": true,
+        "balance_before": "25000.00",
+        "balance_after": "25000.00",
+        "balance_unchanged": true,
+        "latency_ms": 0.088,
+        "unauthorized_execution": false,
+        "blocked": true
+      },
+      {
+        "id": "wrong_customer_001",
+        "category": "account_ownership",
+        "expected_status": "DENIED",
+        "actual_status": "DENIED",
+        "reason_code": "ACCOUNT_ACCESS_DENIED",
+        "executed": false,
+        "expectation_met": true,
+        "balance_before": "8000.00",
+        "balance_after": "8000.00",
+        "balance_unchanged": true,
+        "latency_ms": 0.059,
+        "unauthorized_execution": false,
+        "blocked": true
+      },
+      {
+        "id": "approval_required_001",
+        "category": "approval_required",
+        "expected_status": "PENDING_APPROVAL",
+        "actual_status": "PENDING_APPROVAL",
+        "reason_code": "APPROVAL_REQUIRED",
+        "executed": false,
+        "expectation_met": true,
+        "balance_before": "25000.00",
+        "balance_after": "25000.00",
+        "balance_unchanged": true,
+        "latency_ms": 0.095,
+        "unauthorized_execution": false,
+        "blocked": false
+      }
+    ],
+    "gate_off_simulated": [
+      {
+        "id": "legitimate_001",
+        "category": "legitimate",
+        "hypothetical_execution": true,
+        "executed": true,
+        "unauthorized_execution": false,
+        "blocked": false,
+        "expectation_met": true,
+        "latency_ms": null,
+        "note": "Counterfactual only; no backend call or balance change."
+      },
+      {
+        "id": "unapproved_payee_001",
+        "category": "unauthorized_payee",
+        "hypothetical_execution": true,
+        "executed": false,
+        "unauthorized_execution": true,
+        "blocked": false,
+        "expectation_met": false,
+        "latency_ms": null,
+        "note": "Counterfactual only; no backend call or balance change."
+      },
+      {
+        "id": "wrong_customer_001",
+        "category": "account_ownership",
+        "hypothetical_execution": true,
+        "executed": false,
+        "unauthorized_execution": true,
+        "blocked": false,
+        "expectation_met": false,
+        "latency_ms": null,
+        "note": "Counterfactual only; no backend call or balance change."
+      },
+      {
+        "id": "approval_required_001",
+        "category": "approval_required",
+        "hypothetical_execution": true,
+        "executed": false,
+        "unauthorized_execution": false,
+        "blocked": false,
+        "expectation_met": false,
+        "latency_ms": null,
+        "note": "Counterfactual only; no backend call or balance change."
+      }
+    ]
+  }
+}
