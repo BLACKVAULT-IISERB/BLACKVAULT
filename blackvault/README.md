@@ -2,44 +2,62 @@
 
 ## Purpose
 
-Implements the banking backend and transaction security controls used to authorize, validate, and execute banking transactions requested by the AI agent.
+This package implements the trusted authorization layer for the BLACKVAULT synthetic banking environment.
 
-## File Structure
+It receives structured transaction proposals, applies customer-specific security policies, and allows the mock bank to execute a transaction only after the required checks succeed.
 
-| File | Purpose |
+## Responsibilities
+
+- Validate transaction proposals.
+- Check account ownership and status.
+- Enforce approved-payee rules and spending limits.
+- Handle transactions requiring additional approval.
+- Issue and verify transaction-bound permits.
+- Prevent permit forgery and reuse.
+- Record transaction decisions and audit events.
+- Update synthetic account balances after authorization.
+
+## Main Modules
+
+| Module | Responsibility |
 |---|---|
-| `__init__.py` | Exposes the main classes and functions. |
-| `service.py` | Coordinates authorization, approvals, permits, and transfers. |
-| `transaction_service.py` | Re-exports the `Blackvault` interface. |
-| `gate.py` | Authorizes transaction proposals and enforces security rules. |
-| `policy.py` | Validates amounts, approved payees, and spending limits. |
-| `permits.py` | Issues and verifies signed, time-limited transaction permits. |
-| `approvals.py` | Handles additional approval for high-value transactions. |
-| `bank.py` | Retrieves account information and executes validated transfers. |
-| `audit.py` | Records and retrieves security events. |
-| `models.py` | Defines accounts, policies, proposals, permits, approvals, and decisions. |
-| `state.py` | Stores application data and initializes fictional demo data. |
-| `config.py` | Loads and validates the permit signing key. |
-| `repositories.py` | Provides access to account, policy, and audit data. |
-| `exceptions.py` | Defines custom application exceptions. |
+| `bank.py` | Synthetic account operations and protected transaction execution |
+| `gate.py` | Proposal validation and authorization decisions |
+| `policy.py` | Customer policy and spending-limit checks |
+| `permits.py` | Signed permit creation and verification |
+| `approvals.py` | Approval workflow |
+| `audit.py` | Audit event recording and queries |
+| `models.py` | Transaction, decision, account, and policy models |
+| `state.py` | In-memory application state and demo data |
+| `service.py` | Main application-facing backend interface |
+| `config.py` | Signing-key configuration |
 
-## Transaction Pipeline
+## Transaction Flow
 
-1. `service.py` receives a transaction proposal.
-2. `gate.py` validates the request using `policy.py`.
-3. `approvals.py` handles additional approval when required.
-4. `permits.py` issues a signed permit after authorization.
-5. `bank.py` verifies the permit and rechecks transaction constraints before execution.
-6. `state.py` stores transaction and account data.
-7. `audit.py` records relevant events and outcomes.
-8. `service.py` returns the transaction result.
+1. Receive a structured proposal.
+2. Validate the customer, source account, payee, amount, and currency.
+3. Check account ownership, payee approval, and spending limits.
+4. Request additional approval when required.
+5. Issue a signed permit for an authorized transaction.
+6. Verify the permit and relevant transaction constraints.
+7. Update the synthetic balance and record the outcome.
 
-## Integration with BLACKVAULT
+## Using the Backend
 
-The AI agent submits transaction proposals to this backend. The security gate independently checks whether each proposed transaction is permitted before the banking backend executes it.
+From the repository root, initialize the synthetic state and create the application service using the integration API documented in the root `README.md`.
 
-This package provides the controlled banking environment used to evaluate whether adversarial manipulation of the AI agent can result in unauthorized transactions.
+Use `app.propose(...)` as the application-facing transaction entry point. Do not expose internal bank execution methods, permit-management internals, or signing keys to the AI agent.
 
-## Security Scope
+## Security Notes
 
-The backend uses fictional accounts and synthetic balances. Its approval workflow simulates a trusted-human callback and does not independently verify human identity.
+- Authorization decisions must be made by trusted backend code.
+- Model-generated text must not override customer policy.
+- The signing key must remain within the trusted backend process.
+- Approval must be bound to the specific transaction being approved.
+- Internal Python methods alone are not a security boundary.
+
+## Limitations
+
+The implementation uses in-memory state and simulated approval. It does not provide durable storage, production identity verification, distributed locking, or real banking connectivity.
+
+This package is for controlled research and testing only.
